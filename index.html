@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart FloodGate — Konsep & Arsitektur Sistem | KLIKSTART 4.0</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            navy: '#0F172A',
+            water: '#0284C7',
+            cyanGlow: '#38BDF8',
+            eco: '#10B981',
+            warn: '#F59E0B',
+            danger: '#EF4444',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Pola grid halus untuk latar belakang header */
+    .bg-tech-grid {
+      background-color: #0F172A;
+      background-image: 
+        radial-gradient(circle at 85% 15%, rgba(2, 132, 199, 0.22), transparent 40%),
+        radial-gradient(circle at 15% 85%, rgba(16, 185, 129, 0.14), transparent 40%),
+        linear-gradient(to right, rgba(56, 189, 248, 0.06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(56, 189, 248, 0.06) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+    }
+
+    /* Animasi aliran air pada pipa/saluran */
+    @keyframes flowDash {
+      to {
+        stroke-dashoffset: -24;
+      }
+    }
+    .animate-water-flow {
+      stroke-dasharray: 8 4;
+      animation: flowDash 0.8s linear infinite;
+    }
+
+    /* Animasi gelombang sensor ultrasonik */
+    @keyframes sonarPulse {
+      0% { opacity: 0.9; transform: translateY(0); }
+      100% { opacity: 0.15; transform: translateY(8px); }
+    }
+    .animate-sonar {
+      animation: sonarPulse 1.4s ease-in-out infinite;
+    }
+
+    /* Transisi halus level air dan pintu air di SVG */
+    .svg-smooth {
+      transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Custom range slider styling */
+    input[type="range"].water-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 10px;
+      border-radius: 999px;
+      background: #E2E8F0;
+      outline: none;
+    }
+    input[type="range"].water-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #0284C7;
+      border: 3px solid #FFFFFF;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.45);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    input[type="range"].water-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.12);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-sky-500 selection:text-white">
+
+  <!-- =====================================================================
+       NAVBAR STICKY (Memudahkan presentasi antar bagian ke tim)
+  ====================================================================== -->
+  <nav class="sticky top-0 z-50 bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-800 text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <!-- Ikon Gelombang & Pintu Air -->
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 15c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 3 2M3 19c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 3 2M12 3v7m0 0l-3-3m3 3l3-3" />
+          </svg>
+        </div>
+        <div>
+          <span class="font-bold tracking-tight text-base sm:text-lg">Smart <span class="text-sky-400">FloodGate</span></span>
+          <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-slate-800 text-emerald-400 border border-emerald-500/30 font-medium">KLIKSTART 4.0</span>
+        </div>
+      </div>
+
+      <div class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
+        <a href="#simulasi" class="hover:text-sky-400 transition">Simulasi Interaktif</a>
+        <a href="#arsitektur" class="hover:text-sky-400 transition">Arsitektur Sistem</a>
+        <a href="#hardware" class="hover:text-sky-400 transition">Hardware & Tools</a>
+        <a href="#bisnis" class="hover:text-sky-400 transition">Model Bisnis</a>
+      </div>
+
+      <a href="#simulasi" class="text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white transition shadow-sm">
+        Coba Simulasi
+      </a>
+    </div>
+  </nav>
+
+  <!-- =====================================================================
+       1. HEADER & RINGKASAN KONSEP
+  ====================================================================== -->
+  <header class="bg-tech-grid text-white py-12 sm:py-16 lg:py-20 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-4xl">
+        <!-- Badges Kategori KLIKSTART 4.0 -->
+        <div class="flex flex-wrap items-center gap-2.5 mb-5">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-300 border border-sky-400/30">
+            <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+            KLIKSTART 4.0 • BTP Telkom University
+          </span>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            Fokus Inovasi: IoT & Sustainability
+          </span>
+        </div>
+
+        <!-- Judul Proyek -->
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight text-white mb-5">
+          Smart FloodGate: <span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-emerald-400">Sistem Drainase & Retensi Air Otomatis</span> Berbasis IoT
+        </h1>
+
+        <!-- Penjelasan Singkat Masalah & Solusi -->
+        <p class="text-base sm:text-lg text-slate-300 leading-relaxed mb-8">
+          Genangan banjir di kawasan permukiman dan kampus sering terjadi akibat penumpukan air di saluran drainase serta keterlambatan pengoperasian pintu air manual saat hujan lebat. 
+          <strong class="text-white font-semibold">Smart FloodGate</strong> menghadirkan sistem bak penampung bertingkat dengan saringan sampah mekanis dan pintu air otomatis berbasis sensor ultrasonik yang mengalirkan air ke tampungan akhir secara presisi—sekaligus mengunci otomatis untuk mencegah arus balik saat sungai meluap.
+        </p>
+
+        <!-- Highlight Poin Utama untuk Tim -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-start gap-3">
+            <div class="p-2 rounded-xl bg-sky-500/15 text-sky-400 shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-sm text-white">Respon Otomatis 24/7</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Pintu air terbuka otomatis saat bak primer mencapai batas 80% tanpa menunggu petugas.</p>
+            </div>
+          </div>
+
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-start gap-3">
+            <div class="p-2 rounded-xl bg-amber-500/15 text-amber-400 shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-sm text-white">Proteksi Arus Balik</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Mengunci pintu & mengalihkan ke bak cadangan jika sungai/tampungan akhir sedang pasang.</p>
+            </div>
+          </div>
+
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-start gap-3">
+            <div class="p-2 rounded-xl bg-emerald-500/15 text-emerald-400 shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-sm text-white">Filter Sampah & Solar</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Dilengkapi saringan sampah padat dan panel surya mandiri agar tetap aktif saat listrik padam.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       2. SIMULASI INTERAKTIF ALUR SISTEM
+  ====================================================================== -->
+  <section id="simulasi" class="py-12 sm:py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Judul Section -->
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-sky-600">Visualisasi & Uji Logika</span>
+          <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">Simulasi Interaktif Alur Sistem</h2>
+          <p class="text-sm sm:text-base text-slate-600 mt-1">
+            Geser ketinggian air bak primer dan ubah kondisi sungai untuk melihat cara kerja otomatis pintu air.
+          </p>
+        </div>
+
+        <!-- Status Daya Panel Surya (Indikator Real-Time) -->
+        <div class="inline-flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm">
+          <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          </div>
+          <div class="text-xs">
+            <div class="font-semibold text-slate-800 flex items-center gap-1.5">
+              Solar Panel & Backup Battery
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+            </div>
+            <div class="text-slate-500 font-mono">12.6V • Kapasitas Baterai 96% (Mandiri)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layout Utama Simulasi: Diagram SVG (Kiri/Atas) + Panel Kontrol & Log (Kanan/Bawah) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- KOLOM KIRI (8 Kolom): Visual Diagram SVG Alur Air -->
+        <div class="lg:col-span-8 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+          <!-- Banner Status Sistem Real-time di Atas Diagram -->
+          <div id="statusBanner" class="px-5 py-3.5 bg-sky-50 border-b border-sky-100 flex flex-wrap items-center justify-between gap-2 transition-colors duration-300">
+            <div class="flex items-center gap-2.5">
+              <span id="statusDot" class="w-3 h-3 rounded-full bg-sky-500"></span>
+              <span id="statusTitle" class="font-bold text-sm sm:text-base text-sky-900">STATUS: SIAGA / MENAMPUNG AIR</span>
+            </div>
+            <span id="gateBadge" class="text-xs font-mono font-semibold px-3 py-1 rounded-full bg-slate-800 text-white">
+              PINTU AIR: TERTUTUP
+            </span>
+          </div>
+
+          <!-- Area Canvas SVG Responsif -->
+          <div class="p-3 sm:p-5 bg-slate-900">
+            <svg id="systemSvg" viewBox="0 0 900 410" class="w-full h-auto rounded-2xl bg-[#0B1120] border border-slate-800 select-none">
+              <defs>
+                <!-- Gradien Air -->
+                <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.88" />
+                  <stop offset="100%" stop-color="#0284C7" stop-opacity="0.95" />
+                </linearGradient>
+                <!-- Gradien Sungai Pasang -->
+                <linearGradient id="riverHighGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.85" />
+                  <stop offset="100%" stop-color="#DC2626" stop-opacity="0.9" />
+                </linearGradient>
+              </defs>
+
+              <!-- ================= 1. SALURAN AIR PERMUKIMAN (KIRI) ================= -->
+              <g>
+                <!-- Ikon Rumah Permukiman -->
+                <rect x="24" y="68" width="96" height="58" rx="10" fill="#1E293B" stroke="#334155" stroke-width="1.5" />
+                <path d="M52 94 L72 78 L92 94 V112 H52 Z" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linejoin="round" />
+                <text x="72" y="142" text-anchor="middle" fill="#CBD5E1" font-size="11" font-weight="600">Saluran Air</text>
+                <text x="72" y="156" text-anchor="middle" fill="#94A3B8" font-size="10">Permukiman</text>
+
+                <!-- Pipa Masuk dari Permukiman ke Bak Primer -->
+                <rect x="20" y="176" width="135" height="26" rx="4" fill="#1E293B" stroke="#475569" stroke-width="2" />
+                <!-- Animasi Aliran Air Masuk -->
+                <line x1="26" y1="189" x2="148" y2="189" stroke="#38BDF8" stroke-width="6" stroke-linecap="round" class="animate-water-flow" />
+
+                <!-- Sensor Debit Air (Flow Sensor YF-S201) -->
+                <rect x="64" y="166" width="44" height="14" rx="4" fill="#10B981" />
+                <text x="86" y="176" text-anchor="middle" fill="#064E3B" font-size="8.5" font-weight="800">FLOW</text>
+                <text id="svgFlowText" x="86" y="217" text-anchor="middle" fill="#34D399" font-size="10" font-family="monospace">18.4 L/mnt</text>
+              </g>
+
+              <!-- ================= 2. BAK PENAMPUNG PRIMER + SARINGAN SAMPAH ================= -->
+              <g>
+                <!-- Label Atas Bak Primer -->
+                <text x="285" y="32" text-anchor="middle" fill="#F8FAFC" font-size="13" font-weight="700">BAK PENAMPUNG PRIMER</text>
+
+                <!-- Modul Sensor Ultrasonik di Atas Bak -->
+                <rect x="255" y="44" width="60" height="22" rx="6" fill="#0284C7" stroke="#7DD3FC" stroke-width="1.5" />
+                <text x="285" y="58" text-anchor="middle" fill="#FFFFFF" font-size="9.5" font-weight="700">ULTRASONIK</text>
+                <!-- Gelombang Sonar -->
+                <path d="M273 73 Q285 80 297 73" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" class="animate-sonar" />
+                <path d="M268 82 Q285 91 302 82" fill="none" stroke="#38BDF8" stroke-width="1.5" stroke-linecap="round" class="animate-sonar" />
+
+                <!-- Dinding Bak Primer (x=155..415, y=95..275 -> tinggi dalam = 180px) -->
+                <rect x="155" y="95" width="260" height="180" rx="8" fill="#0F172A" stroke="#64748B" stroke-width="3" />
+
+                <!-- Isi Air Bak Primer (Dinamis via JS: y max=275, height 0..176) -->
+                <rect id="svgPrimaryWater" x="158" y="195" width="254" height="77" rx="4" fill="url(#waterGrad)" class="svg-smooth" />
+
+                <!-- Garis Batas Ambang 80% (y = 275 - (0.8 * 176) = 134) -->
+                <line x1="158" y1="134" x2="412" y2="134" stroke="#F59E0B" stroke-width="1.8" stroke-dasharray="6 4" />
+                <rect x="294" y="118" width="114" height="15" rx="4" fill="#F59E0B" fill-opacity="0.2" />
+                <text x="351" y="128.5" text-anchor="middle" fill="#FBBF24" font-size="9" font-weight="700">BATAS BUKA: 80%</text>
+
+                <!-- Saringan Sampah Mekanis (Trash Rack) di sisi kiri bak -->
+                <line x1="185" y1="102" x2="205" y2="270" stroke="#10B981" stroke-width="3.5" stroke-dasharray="7 5" />
+                <!-- Partikel Sampah Tertahan di Saringan -->
+                <circle cx="176" cy="215" r="4" fill="#A3E635" />
+                <rect x="170" y="232" width="9" height="6" rx="2" fill="#FBBF24" />
+                <circle cx="179" cy="252" r="3.5" fill="#34D399" />
+                <rect x="163" y="283" width="108" height="20" rx="6" fill="#064E3B" stroke="#10B981" stroke-width="1" />
+                <text x="217" y="296" text-anchor="middle" fill="#6EE7B7" font-size="9.5" font-weight="600">Trash Rack (Filter)</text>
+
+                <!-- Persentase Air Besar di Tengah Bak -->
+                <text id="svgPrimaryPercentText" x="295" y="215" text-anchor="middle" fill="#FFFFFF" font-size="26" font-weight="800" font-family="monospace">45%</text>
+                <text x="295" y="232" text-anchor="middle" fill="#BAE6FD" font-size="10" font-weight="600">Level Tampungan</text>
+              </g>
+
+              <!-- ================= 3. PINTU AIR OTOMATIS & KONTROLER ESP32 ================= -->
+              <g>
+                <!-- Saluran Penghubung Bak Primer ke Bak Akhir (x=415..555, y=215..265) -->
+                <rect x="415" y="215" width="140" height="50" fill="#1E293B" stroke="#475569" stroke-width="2.5" />
+
+                <!-- Animasi Aliran Air Keluar Melalui Pintu Air (Aktif saat Pintu Terbuka) -->
+                <line id="svgDischargeStream" x1="418" y1="240" x2="552" y2="240" stroke="#38BDF8" stroke-width="16" stroke-linecap="round" class="animate-water-flow opacity-0 svg-smooth" />
+
+                <!-- Box Kontroler ESP32 + Aktuator di Atas Pintu Air -->
+                <rect x="442" y="72" width="86" height="46" rx="8" fill="#1E293B" stroke="#38BDF8" stroke-width="2" />
+                <text x="485" y="91" text-anchor="middle" fill="#38BDF8" font-size="10.5" font-weight="800">ESP32 IoT</text>
+                <text id="svgActuatorMode" x="485" y="106" text-anchor="middle" fill="#CBD5E1" font-size="8.5" font-family="monospace">STANDBY</text>
+
+                <!-- Batang Aktuator / Motor Linear -->
+                <rect x="481" y="118" width="8" height="94" fill="#94A3B8" />
+
+                <!-- Daun Pintu Air Otomatis (Bergeser naik saat terbuka: y=213 tertutup -> y=166 terbuka) -->
+                <g id="svgFloodGate" class="svg-smooth" transform="translate(0, 0)">
+                  <rect x="473" y="212" width="24" height="54" rx="4" fill="#38BDF8" stroke="#FFFFFF" stroke-width="2" />
+                  <line x1="478" y1="224" x2="492" y2="224" stroke="#0F172A" stroke-width="2" />
+                  <line x1="478" y1="239" x2="492" y2="239" stroke="#0F172A" stroke-width="2" />
+                  <line x1="478" y1="254" x2="492" y2="254" stroke="#0F172A" stroke-width="2" />
+                </g>
+
+                <!-- Ikon Gembok Backwater Lock (Muncul saat Sungai Penuh & Primer >= 80%) -->
+                <g id="svgBackwaterShield" class="opacity-0 svg-smooth">
+                  <rect x="446" y="172" width="78" height="24" rx="6" fill="#EF4444" />
+                  <text x="485" y="187" text-anchor="middle" fill="#FFFFFF" font-size="9.5" font-weight="800">LOCKED 🔒</text>
+                </g>
+
+                <text x="485" y="284" text-anchor="middle" fill="#E2E8F0" font-size="10.5" font-weight="700">Pintu Air Otomatis</text>
+              </g>
+
+              <!-- ================= 4. BAK TAMPUNGAN AKHIR / SUNGAI (KANAN) ================= -->
+              <g>
+                <text x="710" y="32" text-anchor="middle" fill="#F8FAFC" font-size="13" font-weight="700">TAMPUNGAN AKHIR / SUNGAI</text>
+
+                <!-- Dinding Bak Akhir / Sungai (x=555..865, y=95..275) -->
+                <rect x="555" y="95" width="310" height="180" rx="8" fill="#0F172A" stroke="#64748B" stroke-width="3" />
+
+                <!-- Isi Air Sungai / Bak Akhir (Dinamis Normal vs Pasang) -->
+                <rect id="svgRiverWater" x="558" y="210" width="304" height="62" rx="4" fill="url(#waterGrad)" class="svg-smooth" />
+
+                <!-- Sensor Hilir (Hilir Level Sensor) -->
+                <rect x="680" y="44" width="60" height="22" rx="6" fill="#334155" stroke="#94A3B8" stroke-width="1.5" />
+                <text x="710" y="58" text-anchor="middle" fill="#E2E8F0" font-size="9" font-weight="700">SENSOR HILIR</text>
+
+                <text id="svgRiverStatusText" x="710" y="236" text-anchor="middle" fill="#FFFFFF" font-size="15" font-weight="800">NORMAL (35%)</text>
+                <text id="svgRiverSubText" x="710" y="253" text-anchor="middle" fill="#BAE6FD" font-size="10">Kapasitas Tampung Tersedia</text>
+              </g>
+
+              <!-- ================= 5. JALUR BYPASS & BAK RETENSI CADANGAN (BAWAH) ================= -->
+              <g>
+                <!-- Pipa Bypass dari bawah Bak Primer ke Bak Retensi Cadangan -->
+                <path d="M335 275 V338 H445" fill="none" stroke="#475569" stroke-width="14" stroke-linejoin="round" />
+                <!-- Aliran Air Bypass (Hanya aktif saat Backwater Lock) -->
+                <path id="svgBypassStream" d="M335 275 V338 H445" fill="none" stroke="#F59E0B" stroke-width="7" stroke-linejoin="round" class="animate-water-flow opacity-0 svg-smooth" />
+
+                <!-- Katup Bypass -->
+                <circle id="svgBypassValve" cx="335" cy="306" r="11" fill="#334155" stroke="#94A3B8" stroke-width="2" />
+                <text x="275" y="310" text-anchor="end" fill="#94A3B8" font-size="9.5" font-weight="600">Katup Bypass</text>
+
+                <!-- Bak Retensi Cadangan (Emergency Buffer Basin) -->
+                <rect x="445" y="308" width="230" height="76" rx="10" fill="#0F172A" stroke="#475569" stroke-width="2" stroke-dasharray="5 3" />
+                <rect id="svgBackupWater" x="448" y="366" width="224" height="15" rx="6" fill="#F59E0B" fill-opacity="0.7" class="svg-smooth" />
+                <text x="560" y="334" text-anchor="middle" fill="#FBBF24" font-size="11" font-weight="700">BAK RETENSI CADANGAN (BUFFER)</text>
+                <text id="svgBackupSubText" x="560" y="350" text-anchor="middle" fill="#94A3B8" font-size="9.5">Siaga jika sungai sedang pasang tinggi</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <!-- KOLOM KANAN (4 Kolom): Panel Kontrol Interaktif & Serial Log -->
+        <div class="lg:col-span-4 space-y-5">
+          <!-- Card Kontrol Skenario -->
+          <div class="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-sm">
+            <h3 class="font-bold text-base text-slate-900 flex items-center gap-2 mb-4">
+              <span class="w-6 h-6 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center text-xs font-bold">1</span>
+              Kontrol Skenario Simulasi
+            </h3>
+
+            <!-- Slider Ketinggian Air Bak Primer -->
+            <div class="mb-6">
+              <div class="flex items-center justify-between mb-2">
+                <label for="waterLevelSlider" class="text-sm font-semibold text-slate-700">
+                  Ketinggian Air Bak Primer
+                </label>
+                <span id="sliderValueBadge" class="font-mono text-sm font-bold px-2.5 py-0.5 rounded-lg bg-sky-100 text-sky-700">
+                  45%
+                </span>
+              </div>
+              <input
+                id="waterLevelSlider"
+                type="range"
+                min="0"
+                max="100"
+                value="45"
+                class="w-full water-slider"
+              />
+              <div class="flex justify-between text-[11px] text-slate-400 font-mono mt-1.5">
+                <span>0% (Kering)</span>
+                <span class="text-amber-600 font-semibold">80% (Ambang)</span>
+                <span>100%</span>
+              </div>
+
+              <!-- Tombol Preset Cepat untuk Presentasi -->
+              <div class="grid grid-cols-3 gap-2 mt-3">
+                <button type="button" onclick="setPresetLevel(40)" class="text-xs font-medium py-2 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                  Hujan Ringan (40%)
+                </button>
+                <button type="button" onclick="setPresetLevel(85)" class="text-xs font-medium py-2 px-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition">
+                  Hujan Lebat (85%)
+                </button>
+                <button type="button" onclick="setPresetLevel(95)" class="text-xs font-medium py-2 px-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition">
+                  Ekstrem (95%)
+                </button>
+              </div>
+            </div>
+
+            <!-- Toggle Kondisi Bak Akhir / Sungai -->
+            <div class="pt-4 border-t border-slate-100">
+              <label class="block text-sm font-semibold text-slate-700 mb-2.5">
+                Kondisi Bak Akhir / Sungai (Hilir)
+              </label>
+              <div class="grid grid-cols-2 gap-2.5">
+                <button
+                  id="btnRiverNormal"
+                  type="button"
+                  onclick="setRiverCondition('normal')"
+                  class="py-2.5 px-3 rounded-xl text-xs font-bold border-2 border-sky-600 bg-sky-600 text-white shadow-sm transition text-center"
+                >
+                  Normal
+                  <span class="block font-normal text-[10px] opacity-90 mt-0.5">Kapasitas Tersedia</span>
+                </button>
+                <button
+                  id="btnRiverFull"
+                  type="button"
+                  onclick="setRiverCondition('full')"
+                  class="py-2.5 px-3 rounded-xl text-xs font-bold border-2 border-slate-200 bg-white text-slate-700 hover:border-amber-400 transition text-center"
+                >
+                  Penuh / Pasang
+                  <span class="block font-normal text-[10px] text-slate-500 mt-0.5">Sungai Meluap</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Penjelasan Keputusan Sistem Saat Ini -->
+            <div id="decisionExplanation" class="mt-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
+              Ketinggian air masih di bawah ambang batas 80%. Pintu air tetap <strong>tertutup</strong> sambil menampung air dan menyaring sampah padat.
+            </div>
+          </div>
+
+          <!-- Card Real-time Event Log (Simulasi Serial Monitor ESP32) -->
+          <div class="bg-[#0F172A] text-slate-200 border border-slate-800 rounded-3xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <h3 class="font-mono text-xs font-bold uppercase tracking-wider text-slate-300">Log Keputusan ESP32</h3>
+              </div>
+              <button type="button" onclick="clearLogs()" class="text-[11px] text-slate-400 hover:text-white underline">
+                Bersihkan
+              </button>
+            </div>
+            <div id="eventLogList" class="font-mono text-[11px] space-y-2 max-h-44 overflow-y-auto pr-1 text-slate-300">
+              <!-- Log diisi dinamis oleh JavaScript -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       3. ARSITEKTUR SISTEM (4 TAHAP KERJA)
+  ====================================================================== -->
+  <section id="arsitektur" class="py-12 sm:py-16 bg-white border-y border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-3xl mb-10">
+        <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">Alur Kerja Teknis</span>
+        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">Arsitektur Sistem (4 Tahap Kerja)</h2>
+        <p class="text-sm sm:text-base text-slate-600 mt-1.5">
+          Integrasi perangkat keras lapangan (*edge IoT*) dan pemrosesan logika cerdas untuk memastikan drainase bekerja otomatis tanpa memindahkan banjir ke hilir.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Tahap 1 -->
+        <div class="relative bg-slate-50 border border-slate-200 rounded-3xl p-6 hover:border-sky-400 transition group">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-sky-600 text-white flex items-center justify-center shadow-md shadow-sky-600/20">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <span class="font-mono text-xs font-bold text-slate-400 group-hover:text-sky-600">TAHAP 01</span>
+          </div>
+          <h3 class="font-bold text-lg text-slate-900 mb-2">Deteksi Sensor Ketinggian & Debit</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            Sensor ultrasonik membaca tinggi muka air di bak primer dan hilir secara <em>real-time</em>, sementara <em>water flow sensor</em> mengukur kecepatan aliran masuk dari permukiman.
+          </p>
+        </div>
+
+        <!-- Tahap 2 -->
+        <div class="relative bg-slate-50 border border-slate-200 rounded-3xl p-6 hover:border-sky-400 transition group">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-[#0F172A] text-sky-400 flex items-center justify-center shadow-md">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
+            </div>
+            <span class="font-mono text-xs font-bold text-slate-400 group-hover:text-sky-600">TAHAP 02</span>
+          </div>
+          <h3 class="font-bold text-lg text-slate-900 mb-2">Pemrosesan ESP32 & Logika Hilir</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            Mikrokontroler mengevaluasi level bak primer (≥80%) terhadap status ketinggian sungai serta data curah hujan untuk memutuskan buka pintu utama atau aktifkan <em>backwater lock</em>.
+          </p>
+        </div>
+
+        <!-- Tahap 3 -->
+        <div class="relative bg-slate-50 border border-slate-200 rounded-3xl p-6 hover:border-emerald-400 transition group">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <span class="font-mono text-xs font-bold text-slate-400 group-hover:text-emerald-600">TAHAP 03</span>
+          </div>
+          <h3 class="font-bold text-lg text-slate-900 mb-2">Aktuasi Pintu Air & Filter Sampah</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            Saringan miring (<em>trash rack</em>) menahan sampah padat agar tidak menyumbat saluran, sementara motor servo / aktuator linear mengangkat pintu air secara bertahap.
+          </p>
+        </div>
+
+        <!-- Tahap 4 -->
+        <div class="relative bg-slate-50 border border-slate-200 rounded-3xl p-6 hover:border-sky-400 transition group">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-sky-500 text-white flex items-center justify-center shadow-md shadow-sky-500/20">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <span class="font-mono text-xs font-bold text-slate-400 group-hover:text-sky-600">TAHAP 04</span>
+          </div>
+          <h3 class="font-bold text-lg text-slate-900 mb-2">Monitoring Dasbor & Peringatan Dini</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            Status ketinggian air, posisi pintu, dan kondisi baterai dikirim ke dasbor pengelola kawasan disertai notifikasi dini jika terjadi penyumbatan atau curah hujan ekstrem.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       4. DAFTAR KEBUTUHAN HARDWARE & TOOLS (PROTOTIPE MVP vs LAPANGAN)
+  ====================================================================== -->
+  <section id="hardware" class="py-12 sm:py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-sky-600">Bill of Materials (BOM) & Perangkat</span>
+          <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">Kebutuhan Hardware & Tools Implementasi</h2>
+          <p class="text-sm sm:text-base text-slate-600 mt-1">
+            Pilih skala pengembangan untuk melihat spesifikasi alat yang dibutuhkan tim.
+          </p>
+        </div>
+
+        <!-- Filter Tab Skala Prototipe vs Skala Lapangan -->
+        <div class="inline-flex p-1.5 rounded-2xl bg-slate-200/80 border border-slate-300/60 self-start">
+          <button
+            id="tabMvp"
+            type="button"
+            onclick="switchHardwareScale('mvp')"
+            class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-slate-900 shadow-sm transition"
+          >
+            Skala Prototipe / MVP (Demo Pitching)
+          </button>
+          <button
+            id="tabField"
+            type="button"
+            onclick="switchHardwareScale('field')"
+            class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition"
+          >
+            Skala Implementasi Lapangan
+          </button>
+        </div>
+      </div>
+
+      <!-- Banner Info Skala Aktif -->
+      <div id="scaleInfoBanner" class="mb-6 p-4 rounded-2xl bg-sky-50 border border-sky-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="text-sm text-sky-950">
+          <strong class="font-bold">Mode Prototipe / MVP (Maket Meja):</strong> Komponen ekonomis dan mudah dirakit untuk demonstrasi langsung di depan juri KLIKSTART 4.0.
+        </div>
+        <span class="font-mono text-xs font-bold px-3 py-1.5 rounded-xl bg-white text-sky-700 border border-sky-200 shrink-0">
+          Estimasi Biaya MVP: ± Rp 650rb – Rp 950rb
+        </span>
+      </div>
+
+      <!-- Grid Daftar Komponen Hardware -->
+      <div id="hardwareGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Diisi dinamis melalui JavaScript berdasarkan tab MVP / Field -->
+      </div>
+
+      <!-- Box Tools Perakitan & Software Pendukung -->
+      <div class="mt-8 bg-[#0F172A] text-white rounded-3xl p-6 sm:p-8 border border-slate-800">
+        <h3 class="font-bold text-lg text-white mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+          </svg>
+          Tools Perakitan Fisik & Software Pengembangan
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+            <div class="font-semibold text-sky-400 mb-1">Firmware & Coding</div>
+            <p class="text-xs text-slate-300">Arduino IDE / PlatformIO (C++), library <code>ESPAsyncWebServer</code>, <code>NewPing</code>, dan <code>ESP32Servo</code>.</p>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+            <div class="font-semibold text-emerald-400 mb-1">IoT Cloud & Dashboard</div>
+            <p class="text-xs text-slate-300">MQTT Broker / Firebase Realtime DB, Web Dashboard (HTML/Tailwind/JS), & API Cuaca BMKG.</p>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+            <div class="font-semibold text-amber-400 mb-1">Elektronik & Wiring</div>
+            <p class="text-xs text-slate-300">Solder & timah, multimeter digital, kabel jumper <em>male-female</em>, PCB berlubang, dan box panel tahan air.</p>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+            <div class="font-semibold text-purple-400 mb-1">Fabrikasi Maket Bak</div>
+            <p class="text-xs text-slate-300">Lembaran akrilik bening 3mm / boks kontainer plastik, pipa PVC 1–2 dim, lem tembak & sealant silikon anti bocor.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       5. RINGKASAN NILAI BISNIS (KLIKSTART 4.0 CANVAS SINGKAT)
+  ====================================================================== -->
+  <section id="bisnis" class="py-12 sm:py-16 bg-white border-t border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-3xl mb-10">
+        <span class="text-xs font-bold uppercase tracking-wider text-sky-600">Komersialisasi & Keberlanjutan</span>
+        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">Ringkasan Model Bisnis (KLIKSTART 4.0)</h2>
+        <p class="text-sm sm:text-base text-slate-600 mt-1.5">
+          Dirancang agar tidak berhenti sebagai proyek tugas akhir, melainkan solusi komersial B2B dan B2G dengan pendapatan berulang.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Kolom 1: Target Pengguna -->
+        <div class="bg-slate-50 border border-slate-200 rounded-3xl p-6 sm:p-7">
+          <div class="w-11 h-11 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center mb-4">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </div>
+          <h3 class="font-bold text-lg text-slate-900 mb-3">Target Pengguna (B2B & B2G)</h3>
+          <ul class="space-y-3 text-sm text-slate-600">
+            <li class="flex items-start gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-sky-600 text-white text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+              <span><strong>Developer Perumahan Klaster (B2B):</strong> Meningkatkan nilai jual hunian bebas banjir dengan sistem drainase cerdas mandiri.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-sky-600 text-white text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+              <span><strong>Pengelola Kawasan Industri & Kampus:</strong> Mencegah kerusakan aset dan gangguan operasional akibat genangan hujan ekstrem.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-sky-600 text-white text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+              <span><strong>Pemerintah Desa / Kelurahan (B2G):</strong> Solusi titik rawan banjir lokal (seperti kawasan Bojongsoang & Dayeuhkolot).</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Kolom 2: Skema Pendapatan -->
+        <div class="bg-slate-50 border border-slate-200 rounded-3xl p-6 sm:p-7">
+          <div class="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 class="font-bold text-lg text-slate-900 mb-3">Skema Pendapatan (Revenue)</h3>
+          <div class="space-y-3.5 text-sm text-slate-600">
+            <div class="p-3.5 rounded-2xl bg-white border border-slate-200">
+              <div class="font-bold text-slate-900">1. Penjualan Paket Hardware & Instalasi</div>
+              <p class="text-xs text-slate-500 mt-1">Pembelian putus unit pintu air otomatis, sensor, panel surya, dan jasa pemasangan per titik saluran air.</p>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-white border border-slate-200">
+              <div class="font-bold text-emerald-700">2. Langganan Monitoring & Maintenance (SaaS)</div>
+              <p class="text-xs text-slate-500 mt-1">Biaya berlangganan bulanan/tahunan untuk akses dasbor peringatan dini, kalibrasi sensor, dan pembersihan filter rutin.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kolom 3: Keunggulan Unik (UVP) -->
+        <div class="bg-[#0F172A] text-white rounded-3xl p-6 sm:p-7 flex flex-col justify-between">
+          <div>
+            <div class="w-11 h-11 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center mb-4">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              </svg>
+            </div>
+            <h3 class="font-bold text-lg text-white mb-3">Keunggulan Kompetitif Utama</h3>
+            <ul class="space-y-2.5 text-sm text-slate-300">
+              <li class="flex items-start gap-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span><strong>Desain Modular Retrofit:</strong> Dapat dipasang pada saluran drainase yang sudah ada tanpa membongkar infrastruktur total.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span><strong>Anti-Backwater Intelligence:</strong> Mencegah air sungai yang meluap masuk kembali ke kawasan permukiman.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span><strong>Zero-Grid Dependency:</strong> Bertenaga surya sehingga tetap beroperasi penuh saat terjadi pemadaman listrik akibat badai.</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <span>Konsep Ide Bisnis</span>
+            <span class="font-semibold text-sky-400">KLIKSTART 4.0 • BTP Tel-U</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-[#0F172A] text-slate-400 py-8 border-t border-slate-800 text-center text-xs sm:text-sm">
+    <div class="max-w-7xl mx-auto px-4">
+      <p class="font-semibold text-slate-200">Smart FloodGate — Sistem Drainase & Retensi Air Otomatis Berbasis IoT</p>
+      <p class="mt-1 text-slate-500">Dokumen Visual Konsep & Arsitektur Sistem untuk Kompetisi Ide Bisnis KLIKSTART 4.0 BTP Telkom University</p>
+    </div>
+  </footer>
+
+  <!-- =====================================================================
+       JAVASCRIPT: LOGIKA SIMULASI INTERAKTIF & DATA HARDWARE
+  ====================================================================== -->
+  <script>
+    // State Simulasi
+    let primaryWaterLevel = 45; // 0 - 100%
+    let riverCondition = 'normal'; // 'normal' | 'full'
+    let lastStateKey = '';
+
+    // Elemen DOM Simulasi
+    const slider = document.getElementById('waterLevelSlider');
+    const sliderValueBadge = document.getElementById('sliderValueBadge');
+    const btnRiverNormal = document.getElementById('btnRiverNormal');
+    const btnRiverFull = document.getElementById('btnRiverFull');
+
+    const statusBanner = document.getElementById('statusBanner');
+    const statusDot = document.getElementById('statusDot');
+    const statusTitle = document.getElementById('statusTitle');
+    const gateBadge = document.getElementById('gateBadge');
+    const decisionExplanation = document.getElementById('decisionExplanation');
+    const eventLogList = document.getElementById('eventLogList');
+
+    // Elemen SVG
+    const svgPrimaryWater = document.getElementById('svgPrimaryWater');
+    const svgPrimaryPercentText = document.getElementById('svgPrimaryPercentText');
+    const svgFlowText = document.getElementById('svgFlowText');
+    const svgFloodGate = document.getElementById('svgFloodGate');
+    const svgActuatorMode = document.getElementById('svgActuatorMode');
+    const svgDischargeStream = document.getElementById('svgDischargeStream');
+    const svgBackwaterShield = document.getElementById('svgBackwaterShield');
+    const svgRiverWater = document.getElementById('svgRiverWater');
+    const svgRiverStatusText = document.getElementById('svgRiverStatusText');
+    const svgRiverSubText = document.getElementById('svgRiverSubText');
+    const svgBypassStream = document.getElementById('svgBypassStream');
+    const svgBypassValve = document.getElementById('svgBypassValve');
+    const svgBackupWater = document.getElementById('svgBackupWater');
+    const svgBackupSubText = document.getElementById('svgBackupSubText');
+
+    // Fungsi Menambahkan Log ke Panel ESP32
+    function addEventLog(message, type = 'info') {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0];
+      const item = document.createElement('div');
+
+      let colorClass = 'text-sky-300';
+      if (type === 'open') colorClass = 'text-emerald-400';
+      if (type === 'lock') colorClass = 'text-amber-400';
+
+      item.className = 'border-l-2 border-slate-700 pl-2.5 py-0.5 leading-snug';
+      item.innerHTML = `<span class="text-slate-500">[${timeStr}]</span> <span class="${colorClass}">${message}</span>`;
+
+      eventLogList.prepend(item);
+
+      // Batasi maksimal 12 baris log agar tetap rapi
+      if (eventLogList.children.length > 12) {
+        eventLogList.removeChild(eventLogList.lastChild);
+      }
+    }
+
+    function clearLogs() {
+      eventLogList.innerHTML = '';
+      addEventLog('Log dibersihkan. Sistem memantau sensor...', 'info');
+    }
+
+    // Preset tombol cepat ketinggian air
+    function setPresetLevel(val) {
+      slider.value = val;
+      primaryWaterLevel = val;
+      updateSimulation();
+    }
+
+    // Toggle kondisi sungai / bak akhir
+    function setRiverCondition(condition) {
+      riverCondition = condition;
+
+      if (condition === 'normal') {
+        btnRiverNormal.className = 'py-2.5 px-3 rounded-xl text-xs font-bold border-2 border-sky-600 bg-sky-600 text-white shadow-sm transition text-center';
+        btnRiverFull.className = 'py-2.5 px-3 rounded-xl text-xs font-bold border-2 border-slate-200 bg-white text-slate-700 hover:border-amber-400 transition text-center';
+      } else {
+        btnRiverFull.className = 'py-2.5 px-3 rounded-xl text-xs font-bold border-2 border-amber-500 bg-amber-500 text-white shadow-sm transition text-center';
+        btnRiverNormal.className = 'py-2.5 px-3 rounded-xl text-xs font-bold border-2 border-slate-200 bg-white text-slate-700 hover:border-sky-400 transition text-center';
+      }
+
+      updateSimulation();
+    }
+
+    // Fungsi Utama Pembaruan Visual & Logika Otomatis
+    function updateSimulation() {
+      primaryWaterLevel = parseInt(slider.value, 10);
+      sliderValueBadge.textContent = `${primaryWaterLevel}%`;
+      svgPrimaryPercentText.textContent = `${primaryWaterLevel}%`;
+
+      // Simulasi pembacaan debit air masuk proporsional dengan curah hujan/level
+      const flowRate = (6.5 + (primaryWaterLevel * 0.28)).toFixed(1);
+      svgFlowText.textContent = `${flowRate} L/mnt`;
+
+      // Hitung tinggi air di dalam SVG Bak Primer (y dasar = 272, tinggi maks = 172)
+      const maxTankHeight = 172;
+      const waterHeight = Math.max(4, Math.round((primaryWaterLevel / 100) * maxTankHeight));
+      const waterY = 272 - waterHeight;
+      svgPrimaryWater.setAttribute('y', waterY);
+      svgPrimaryWater.setAttribute('height', waterHeight);
+
+      // Update Visual Bak Akhir / Sungai
+      if (riverCondition === 'normal') {
+        svgRiverWater.setAttribute('y', 210);
+        svgRiverWater.setAttribute('height', 62);
+        svgRiverWater.setAttribute('fill', 'url(#waterGrad)');
+        svgRiverStatusText.textContent = 'NORMAL (35%)';
+        svgRiverSubText.textContent = 'Kapasitas Tampung Tersedia';
+      } else {
+        svgRiverWater.setAttribute('y', 118);
+        svgRiverWater.setAttribute('height', 154);
+        svgRiverWater.setAttribute('fill', 'url(#riverHighGrad)');
+        svgRiverStatusText.textContent = 'PASANG TINGGI (90%)';
+        svgRiverSubText.textContent = 'Tekanan Air Hilir Tinggi!';
+      }
+
+      // ================= EVALUASI 3 LOGIKA UTAMA SISTEM =================
+      let currentStateKey = '';
+
+      if (primaryWaterLevel < 80) {
+        // KONDISI 1: Bak Primer < 80% -> Pintu Air TERTUTUP (Siaga / Menampung)
+        currentStateKey = `STANDBY_${riverCondition}`;
+
+        statusBanner.className = 'px-5 py-3.5 bg-sky-50 border-b border-sky-100 flex flex-wrap items-center justify-between gap-2 transition-colors duration-300';
+        statusDot.className = 'w-3 h-3 rounded-full bg-sky-500';
+        statusTitle.className = 'font-bold text-sm sm:text-base text-sky-900';
+        statusTitle.textContent = 'STATUS: SIAGA / MENAMPUNG AIR';
+        gateBadge.className = 'text-xs font-mono font-semibold px-3 py-1 rounded-full bg-slate-800 text-white';
+        gateBadge.textContent = 'PINTU AIR: TERTUTUP';
+
+        // Animasi SVG Gate Tertutup
+        svgFloodGate.setAttribute('transform', 'translate(0, 0)');
+        svgActuatorMode.textContent = 'STANDBY';
+        svgDischargeStream.classList.add('opacity-0');
+        svgBackwaterShield.classList.add('opacity-0');
+
+        // Bypass & Bak Cadangan Standby
+        svgBypassStream.classList.add('opacity-0');
+        svgBypassValve.setAttribute('fill', '#334155');
+        svgBackupWater.setAttribute('y', 366);
+        svgBackupWater.setAttribute('height', 15);
+        svgBackupSubText.textContent = 'Siaga jika sungai sedang pasang tinggi';
+
+        decisionExplanation.className = 'mt-5 p-3.5 rounded-2xl bg-sky-50/70 border border-sky-200 text-xs text-slate-700 leading-relaxed';
+        decisionExplanation.innerHTML = `Level bak primer (<strong>${primaryWaterLevel}%</strong>) masih di bawah ambang 80%. Pintu air tetap <strong>TERTUTUP</strong> sementara saringan sampah menahan limbah padat.`;
+
+        if (lastStateKey !== currentStateKey) {
+          addEventLog(`Level Primer ${primaryWaterLevel}% (<80%). Pintu air TERTUTUP (Mode Siaga).`, 'info');
+        }
+
+      } else if (primaryWaterLevel >= 80 && riverCondition === 'normal') {
+        // KONDISI 2: Bak Primer >= 80% DAN Sungai Normal -> Pintu Air OTOMATIS TERBUKA
+        currentStateKey = 'DISCHARGE_OPEN';
+
+        statusBanner.className = 'px-5 py-3.5 bg-emerald-50 border-b border-emerald-200 flex flex-wrap items-center justify-between gap-2 transition-colors duration-300';
+        statusDot.className = 'w-3 h-3 rounded-full bg-emerald-500 animate-ping';
+        statusTitle.className = 'font-bold text-sm sm:text-base text-emerald-900';
+        statusTitle.textContent = 'STATUS: PEMBUANGAN AKTIF — BANJIR TERCEGAH';
+        gateBadge.className = 'text-xs font-mono font-semibold px-3 py-1 rounded-full bg-emerald-600 text-white shadow-sm';
+        gateBadge.textContent = 'PINTU AIR: OTOMATIS TERBUKA';
+
+        // Animasi SVG Gate Terangkat ke Atas
+        svgFloodGate.setAttribute('transform', 'translate(0, -46)');
+        svgActuatorMode.textContent = 'OPENING 100%';
+        svgDischargeStream.classList.remove('opacity-0');
+        svgBackwaterShield.classList.add('opacity-0');
+
+        // Bypass Tertutup
+        svgBypassStream.classList.add('opacity-0');
+        svgBypassValve.setAttribute('fill', '#334155');
+        svgBackupWater.setAttribute('y', 366);
+        svgBackupWater.setAttribute('height', 15);
+        svgBackupSubText.textContent = 'Tidak diperlukan — aliran lancar ke hilir';
+
+        // Naikkan sedikit permukaan air sungai karena menerima buangan
+        svgRiverWater.setAttribute('y', 194);
+        svgRiverWater.setAttribute('height', 78);
+        svgRiverStatusText.textContent = 'MENERIMA ALIRAN (45%)';
+
+        decisionExplanation.className = 'mt-5 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 leading-relaxed';
+        decisionExplanation.innerHTML = `<strong>Ambang 80% tercapai!</strong> Sensor hilir mendeteksi sungai dalam kondisi <strong>Normal</strong>. Aktuator mengangkat pintu air secara otomatis untuk mengalirkan air ke tampungan akhir sehingga permukiman bebas genangan.`;
+
+        if (lastStateKey !== currentStateKey) {
+          addEventLog(`ALERT: Primer ${primaryWaterLevel}% (>=80%) & Sungai Normal -> BUKA PINTU AIR OTOMATIS!`, 'open');
+        }
+
+      } else {
+        // KONDISI 3: Bak Primer >= 80% DAN Sungai Penuh/Pasang -> Pintu Air TERKUNCI (Backwater Lock) + Bypass Cadangan
+        currentStateKey = 'BACKWATER_LOCK';
+
+        statusBanner.className = 'px-5 py-3.5 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center justify-between gap-2 transition-colors duration-300';
+        statusDot.className = 'w-3 h-3 rounded-full bg-red-500 animate-pulse';
+        statusTitle.className = 'font-bold text-sm sm:text-base text-amber-950';
+        statusTitle.textContent = 'STATUS: PROTEKSI ARUS BALIK (BACKWATER LOCK)';
+        gateBadge.className = 'text-xs font-mono font-semibold px-3 py-1 rounded-full bg-red-600 text-white shadow-sm';
+        gateBadge.textContent = 'PINTU AIR: TERKUNCI 🔒';
+
+        // Animasi SVG Gate Mengunci Rapat + Shield Aktif
+        svgFloodGate.setAttribute('transform', 'translate(0, 0)');
+        svgActuatorMode.textContent = 'BACKWATER LOCK';
+        svgDischargeStream.classList.add('opacity-0');
+        svgBackwaterShield.classList.remove('opacity-0');
+
+        // Aktifkan Jalur Bypass ke Bak Retensi Cadangan
+        svgBypassStream.classList.remove('opacity-0');
+        svgBypassValve.setAttribute('fill', '#F59E0B');
+        svgBackupWater.setAttribute('y', 342);
+        svgBackupWater.setAttribute('height', 39);
+        svgBackupSubText.textContent = 'AKTIF: Menampung limpasan darurat!';
+
+        decisionExplanation.className = 'mt-5 p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-950 leading-relaxed';
+        decisionExplanation.innerHTML = `<strong>Proteksi Arus Balik Aktif!</strong> Meskipun bak primer penuh (<strong>${primaryWaterLevel}%</strong>), sungai sedang <strong>Pasang Tinggi</strong>. Pintu utama <strong>DIKUNCI</strong> agar air sungai tidak meluap balik ke permukiman, dan air dialihkan ke <strong>Bak Retensi Cadangan</strong>.`;
+
+        if (lastStateKey !== currentStateKey) {
+          addEventLog(`BAHAYA HILIR: Sungai Pasang! Pintu utama DIKUNCI & katup bypass cadangan DIBUKA.`, 'lock');
+        }
+      }
+
+      lastStateKey = currentStateKey;
+    }
+
+    // Event Listener Slider
+    slider.addEventListener('input', updateSimulation);
+
+    // =====================================================================
+    // DATA & FILTER KOMPONEN HARDWARE (PROTOTIPE MVP vs IMPLEMENTASI LAPANGAN)
+    // =====================================================================
+    const hardwareData = {
+      mvp: [
+        {
+          category: 'Mikrokontroler Utama',
+          name: 'ESP32 DevKit V1 (Wi-Fi + Bluetooth)',
+          spec: 'Dual-Core 240MHz, 30 Pin, 3.3V Logic',
+          func: 'Otak pemroses data sensor ultrasonik & flow meter, mengeksekusi logika buka/kunci pintu, serta mengirim data ke dasbor IoT.'
+        },
+        {
+          category: 'Sensor Ketinggian Air',
+          name: 'Sensor Ultrasonik HC-SR04 / JSN-SR04T',
+          spec: 'Jarak ukur 2cm – 400cm, akurasi ±3mm',
+          func: 'Dipasang di atas bak penampung primer & hilir untuk mengukur persentase ketinggian air tanpa menyentuh air secara langsung.'
+        },
+        {
+          category: 'Sensor Debit Air',
+          name: 'Water Flow Sensor YF-S201',
+          spec: 'Ukuran pipa 1/2 inch, Hall-Effect 1–30 L/mnt',
+          func: 'Mengukur kecepatan debit air masuk dari saluran permukiman untuk mendeteksi lonjakan hujan secara dini.'
+        },
+        {
+          category: 'Aktuator Pintu Air',
+          name: 'Motor Servo Torsi Tinggi MG996R',
+          spec: 'Metal Gear, Torsi 11 kg/cm, Tegangan 5V–6V',
+          func: 'Menggerakkan tuas pintu air geser pada maket secara presisi (membuka 90°–180° saat bak mencapai 80%).'
+        },
+        {
+          category: 'Sistem Daya Mandiri',
+          name: 'Mini Solar Panel 6V + Baterai Li-Ion 18650',
+          spec: 'Panel 2W, Modul Charger TP4056 & Step-Down',
+          func: 'Menyuplai daya mandiri ke ESP32 dan servo sehingga prototipe tetap beroperasi tanpa kabel adaptor PLN.'
+        },
+        {
+          category: 'Struktur, Filter & Indikator',
+          name: 'Bak Akrilik, Trash Rack, Relay & LCD I2C 16x2',
+          spec: 'Akrilik bening 3mm, kasa filter, LCD karakter',
+          func: 'Bak transparan memudahkan juri melihat level air; trash rack menyaring sampah; LCD menampilkan status lokal secara langsung.'
+        }
+      ],
+      field: [
+        {
+          category: 'Industrial Controller',
+          name: 'ESP32 Industrial PLC / LoRaWAN Node',
+          spec: 'Enclosure IP65, komunikasi jarak jauh LoRa/4G',
+          func: 'Tahan cuaca ekstrem dan kelembapan tinggi di lapangan, mendukung komunikasi antar titik pintu air di kawasan luas.'
+        },
+        {
+          category: 'Sensor Level Lapangan',
+          name: 'Ultrasonic Waterproof JSN-SR04T / Radar Level',
+          spec: 'Probe IP67 tahan cipratan & lumpur',
+          func: 'Mengukur ketinggian air saluran drainase dan permukaan sungai secara akurat meskipun terjadi hujan badai.'
+        },
+        {
+          category: 'Sensor Debit Saluran',
+          name: 'Industrial Ultrasonic / Doppler Flow Meter',
+          spec: 'Non-contact / pipa besar 4–12 inch',
+          func: 'Memantau volume limpasan air hujan di saluran utama kawasan perumahan atau industri.'
+        },
+        {
+          category: 'Aktuator Pintu Air Berat',
+          name: 'Linear Actuator 12V/24V DC Heavy Duty',
+          spec: 'Gaya dorong 1000N–3000N, IP66 Waterproof',
+          func: 'Mengangkat pintu air plat baja/aluminium terhadap tekanan arus air deras dan mengunci rapat saat backwater.'
+        },
+        {
+          category: 'Sistem Daya Off-Grid',
+          name: 'Solar Panel 50Wp + Aki Kering VRLA 12V 20Ah',
+          spec: 'Solar Charge Controller PWM/MPPT 10A',
+          func: 'Menjamin operasional 24/7 selama beberapa hari mendung berturut-turut dan saat listrik kawasan padam.'
+        },
+        {
+          category: 'Struktur Sipil & Filtrasi',
+          name: 'Pintu Air Stainless, Check Valve & Trash Rack Baja',
+          spec: 'Katup satu arah otomatis & kisi saringan miring',
+          func: 'Menahan sampah plastik/ranting sebelum masuk pintu air serta memberikan proteksi mekanis ganda terhadap arus balik sungai.'
+        }
+      ]
+    };
+
+    function switchHardwareScale(scale) {
+      const tabMvp = document.getElementById('tabMvp');
+      const tabField = document.getElementById('tabField');
+      const scaleInfoBanner = document.getElementById('scaleInfoBanner');
+      const hardwareGrid = document.getElementById('hardwareGrid');
+
+      if (scale === 'mvp') {
+        tabMvp.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-slate-900 shadow-sm transition';
+        tabField.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition';
+        scaleInfoBanner.className = 'mb-6 p-4 rounded-2xl bg-sky-50 border border-sky-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+        scaleInfoBanner.innerHTML = `
+          <div class="text-sm text-sky-950">
+            <strong class="font-bold">Mode Prototipe / MVP (Maket Meja):</strong> Komponen ekonomis dan mudah dirakit untuk demonstrasi langsung di depan juri KLIKSTART 4.0.
+          </div>
+          <span class="font-mono text-xs font-bold px-3 py-1.5 rounded-xl bg-white text-sky-700 border border-sky-200 shrink-0">
+            Estimasi Biaya MVP: ± Rp 650rb – Rp 950rb
+          </span>
+        `;
+      } else {
+        tabField.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#0F172A] text-white shadow-sm transition';
+        tabMvp.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition';
+        scaleInfoBanner.className = 'mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+        scaleInfoBanner.innerHTML = `
+          <div class="text-sm text-emerald-950">
+            <strong class="font-bold">Mode Implementasi Lapangan (Komersial):</strong> Spesifikasi tahan cuaca (IP65–IP67) dan torsi tinggi untuk pemasangan di perumahan, kampus, atau kelurahan.
+          </div>
+          <span class="font-mono text-xs font-bold px-3 py-1.5 rounded-xl bg-white text-emerald-700 border border-emerald-200 shrink-0">
+            Paket Modular Retrofit B2B / B2G
+          </span>
+        `;
+      }
+
+      // Render Kartu Komponen
+      const items = hardwareData[scale];
+      hardwareGrid.innerHTML = items.map((item, idx) => `
+        <div class="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-sm hover:shadow-md hover:border-sky-300 transition flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <span class="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg ${scale === 'mvp' ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}">
+                ${item.category}
+              </span>
+              <span class="font-mono text-xs text-slate-400">#0${idx + 1}</span>
+            </div>
+            <h3 class="font-bold text-base text-slate-900 mb-1.5">${item.name}</h3>
+            <div class="font-mono text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 mb-3">
+              ${item.spec}
+            </div>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-600 leading-relaxed border-t border-slate-100 pt-3">
+            <strong class="text-slate-800">Fungsi:</strong> ${item.func}
+          </p>
+        </div>
+      `).join('');
+    }
+
+    // Inisialisasi saat halaman dimuat
+    window.addEventListener('DOMContentLoaded', () => {
+      updateSimulation();
+      switchHardwareScale('mvp');
+    });
+  </script>
+</body>
+</html>
